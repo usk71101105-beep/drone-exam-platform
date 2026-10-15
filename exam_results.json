@@ -1,0 +1,25 @@
+{
+  "exam_history": [],
+  "category_stats": {},
+  "incorrect_pool": {},
+  "activity_history": [
+    {
+      "timestamp": "2026-10-15 21:45:53",
+      "user_email": "usk71101105@gmail.com",
+      "action": "ログイン",
+      "details": "システムログイン"
+    },
+    {
+      "timestamp": "2026-10-15 21:51:15",
+      "user_email": "usk71101105@gmail.com",
+      "action": "ログイン",
+      "details": "システムログイン"
+    },
+    {
+      "timestamp": "2026-10-15 21:54:37",
+      "user_email": "usk71101105@gmail.com",
+      "action": "ログイン",
+      "details": "システムログイン"
+    }
+  ]
+}
