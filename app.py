@@ -677,11 +677,14 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     st.rerun()
                 
                 if can_remove_admins and adm != current_user and role != "master":
-                    if col_n3.button("権限解除", key=f"del_adm_{adm}"):
-                        del admins_dict[adm]
-                        save_admins(admins_dict)
-                        st.success(f"`{adm}` の管理者権限を解除しました。")
-                        st.rerun()
+                    # --- 安全確認用チェックボックスを追加 ---
+                    confirm_del_adm = col_n3.checkbox("削除確認", key=f"chk_adm_{adm}")
+                    if confirm_del_adm:
+                        if col_n3.button("権限解除", key=f"del_adm_{adm}"):
+                            del admins_dict[adm]
+                            save_admins(admins_dict)
+                            st.success(f"`{adm}` の管理者権限を解除しました。")
+                            st.rerun()
                 else:
                     col_n3.write("")
             st.markdown("---")
@@ -767,11 +770,14 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     st.rerun()
                 
                 if mem_email != MASTER_ADMIN:
-                    if col_m3.button("削除", key=f"del_mem_{mem_email}"):
-                        del email_to_name[mem_email]
-                        save_association_members_json(email_to_name)
-                        st.success(f"`{mem_email}` を会員リストから削除しました。")
-                        st.rerun()
+                    # --- 安全確認用チェックボックスを追加 ---
+                    confirm_del_mem = col_m3.checkbox("削除確認", key=f"chk_mem_{mem_email}")
+                    if confirm_del_mem:
+                        if col_m3.button("削除", key=f"del_mem_{mem_email}"):
+                            del email_to_name[mem_email]
+                            save_association_members_json(email_to_name)
+                            st.success(f"`{mem_email}` を会員リストから削除しました。")
+                            st.rerun()
                 else:
                     col_m3.write("*(マスター)*")
             st.markdown("---")
@@ -1001,13 +1007,16 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
         
         storage = st.session_state.app_storage
         
+        # --- 全データリセットにも安全確認用チェックボックスを追加 ---
         if st.checkbox("⚙️ 高度な操作：すべての成績・受験履歴を完全に初期化する", key="show_reset_all_chk"):
             st.warning("⚠️ この操作を行うと、本番模試の履歴だけでなく、**すべてのユーザーのカテゴリー別成績データおよび弱点克服プールのストックが完全に削除**されます。")
-            if st.button("🚨 【完全リセット実行】すべての成績データを初期化する", key="reset_all_data_btn"):
-                storage["exam_history"] = []
-                storage["category_stats"] = {}
-                storage["incorrect_pool"] = {}
-                storage["activity_history"] = []
-                save_exam_results(storage)
-                st.success("すべての成績データを完全にリセットしました！")
-                st.rerun()
+            confirm_reset_all = st.checkbox("本当にすべての成績データを初期化する（確認チェック）", key="confirm_reset_all_chk")
+            if confirm_reset_all:
+                if st.button("🚨 【完全リセット実行】すべての成績データを初期化する", key="reset_all_data_btn"):
+                    storage["exam_history"] = []
+                    storage["category_stats"] = {}
+                    storage["incorrect_pool"] = {}
+                    storage["activity_history"] = []
+                    save_exam_results(storage)
+                    st.success("すべての成績データを完全にリセットしました！")
+                    st.rerun()
