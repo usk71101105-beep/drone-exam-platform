@@ -7,7 +7,7 @@ import re
 import time
 import base64
 import requests
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # ==========================================
 # 1. ページ基本設定
@@ -28,6 +28,11 @@ MEMBERS_JSON_FILE = "members.json"
 BACKUP_JSON_FILE = "deleted_backup_history.json"
 MANUAL_BACKUP_JSON_FILE = "manual_backup_history.json"
 EXCEL_FILENAME = "drone_exam_questions_detailed_calc.xlsx"
+
+# 日本時間（JST = UTC+9）の現在時刻を取得する関数
+def get_jst_now_str():
+    jst = timezone(timedelta(hours=9))
+    return datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S")
 
 # GitHub Secretsから認証情報を取得（未設定の場合はローカル動作）
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", os.environ.get("GITHUB_TOKEN", ""))
@@ -74,7 +79,7 @@ def save_to_deleted_backup(item_type, target_id, target_data):
         except:
             pass
             
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = get_jst_now_str()
     backup_data["deleted_history"].append({
         "timestamp": now_str,
         "type": item_type,
@@ -227,7 +232,7 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.session_state.user_email = input_email
                     
-                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    now_str = get_jst_now_str()
                     storage = st.session_state.app_storage
                     if "activity_history" not in storage:
                         storage["activity_history"] = []
@@ -528,7 +533,7 @@ if app_mode == "📝 問題演習・模擬テスト":
                     if user_ans == correct_ans:
                         session_results[cat]["correct"] += 1
                 
-                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                now_str = get_jst_now_str()
                 storage = st.session_state.app_storage
                 
                 if "incorrect_pool" not in storage:
@@ -779,12 +784,12 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     exam_type = h.get("exam_type", "演習")
                     rate = h.get("rate", 0)
                     
-                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type") == exam_type]
+                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type"] == exam_type]
                     avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
                     
                     prev_rates = []
                     for item in sorted_user_history_all:
-                        if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp"):
+                        if item.get("exam_type"] == exam_type and item.get("timestamp") < h.get("timestamp"):
                             prev_rates.append(item["rate"])
                     
                     prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
@@ -820,7 +825,7 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
         st.write("現在の全データ（会員リスト、管理者リスト、成績・テスト履歴など）を手動でバックアップし、追加保存します。")
         
         if st.button("💾 現在のデータを手動バックアップする", key="manual_backup_btn"):
-            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            now_str = get_jst_now_str()
             
             manual_backup_data = {"manual_backups": []}
             if os.path.exists(MANUAL_BACKUP_JSON_FILE):
