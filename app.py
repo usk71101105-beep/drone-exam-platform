@@ -343,7 +343,7 @@ if app_mode == "📝 問題演習・模擬テスト":
         st.write("一等・二等の各分野演習、長文事例問題、本番模試、および間違えた問題を克服する**弱点克服モード**に挑戦できます。")
         
         def reset_quiz_state():
-            for key in ["current_quiz", "user_answers", "submitted", "exam_mode", "start_time", "time_limit", "is_review_mode"]:
+            for key in ["current_quiz", "user_answers", "submitted", "exam_mode", "start_time", "time_limit", "is_review_mode", "selected_category_name"]:
                 if key in st.session_state:
                     del st.session_state[key]
 
@@ -363,6 +363,7 @@ if app_mode == "📝 問題演習・模擬テスト":
             if st.button(f"🔥 【弱点克服モード】間違えた問題の再挑戦を開始する ({len(user_incorrect_indices)}問)", key="start_review_btn"):
                 reset_quiz_state()
                 st.session_state.is_review_mode = True
+                st.session_state.selected_category_name = "弱点克服モード"
                 target_df = df_questions.iloc[user_incorrect_indices].reset_index(drop=True)
                 st.session_state.current_quiz = target_df.sample(frac=1).reset_index(drop=True)
                 st.session_state.user_answers = {}
@@ -395,6 +396,7 @@ if app_mode == "📝 問題演習・模擬テスト":
                 st.session_state.exam_mode = exam_config
                 st.session_state.start_time = time.time()
                 st.session_state.time_limit = exam_config["time_min"] * 60
+                st.session_state.selected_category_name = exam_config["name"]
                 
                 temp_pool = target_df.copy()
                 chosen_rows = []
@@ -436,13 +438,16 @@ if app_mode == "📝 問題演習・模擬テスト":
                 available_cats = target_df["category"].unique().tolist()
                 selected_category = st.selectbox("出題カテゴリーを選択してください", available_cats, key="cat_select")
                 current_pool = target_df[target_df["category"] == selected_category].reset_index(drop=True)
+                chosen_test_label = selected_category
             else:
                 current_pool = target_df
+                chosen_test_label = "コース全体ランダム演習"
                 
             num_questions = st.slider("出題数を選択", min_value=5, max_value=min(30, len(current_pool)), value=10, key="num_q_slider")
             
             if st.button("テストを開始する", key="start_practice_btn"):
                 reset_quiz_state()
+                st.session_state.selected_category_name = chosen_test_label
                 temp_pool = current_pool.copy()
                 chosen_rows = []
                 
@@ -543,7 +548,7 @@ if app_mode == "📝 問題演習・模擬テスト":
                         if inc_idx not in user_inc_list:
                             user_inc_list.append(inc_idx)
                 
-                test_name_label = "練習・カテゴリー演習" if not st.session_state.get("exam_mode") else st.session_state.exam_mode["name"]
+                test_name_label = st.session_state.get("selected_category_name", "演習・テスト")
                 new_record = {
                     "timestamp": now_str, "user_email": current_user, "exam_type": test_name_label,
                     "score": score, "total": total, "rate": round((score / total * 100), 1) if total > 0 else 0,
@@ -734,7 +739,8 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
             u_hist = user_exams_map.get(m_email, [])
             u_hist_sorted = sorted(u_hist, key=lambda x: x.get("timestamp", ""), reverse=True)
             
-            history_str_1 = f"{u_hist_sorted[0]['timestamp']} ({u_hist_sorted[0]['exam_type']} / 正答率: {u_hist_sorted[0]['rate']}%)" if len(u_hist_sorted) > 0 else "履歴なし"
+            # 日時を省き、テスト名と正答率のみを表示
+            history_str_1 = f"{u_hist_sorted[0]['exam_type']} (正答率: {u_hist_sorted[0]['rate']}%)" if len(u_hist_sorted) > 0 else "履歴なし"
             
             member_status_list.append({
                 "氏名": m_name,
@@ -770,7 +776,7 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     same_type_history = [item["rate"] for item in user_history if item.get("exam_type") == exam_type]
                     avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
                     
-                    prev_rates = [item["rate"] for item in sorted(user_history, key=lambda x: x.get("timestamp", "")) if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp")]
+                    prev_rates = [item["rate"] for item in sorted(user_history, key=lambda x: x.get("timestamp", "")) if item.get("exam_type") == exam_type and item.get("timestamp"] < h.get("timestamp")]
                     prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
 
                     report_list.append({
