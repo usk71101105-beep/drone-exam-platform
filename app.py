@@ -841,14 +841,18 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                         
                         same_type_history = []
                         for item in user_history:
-                            if item.get("exam_type") == exam_type:
+                            item_exam_type = item.get("exam_type")
+                            if item_exam_type == exam_type:
                                 same_type_history.append(item["rate"])
                         
                         avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
                         
                         prev_rates = []
                         for item in sorted_user_history_all:
-                            if item.get("exam_type"] == exam_type and item.get("timestamp") < h.get("timestamp"):
+                            item_exam_type = item.get("exam_type")
+                            item_timestamp = item.get("timestamp")
+                            h_timestamp = h.get("timestamp")
+                            if item_exam_type == exam_type and item_timestamp < h_timestamp:
                                 prev_rates.append(item["rate"])
                         
                         prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
