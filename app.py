@@ -35,7 +35,7 @@ GITHUB_REPO = st.secrets.get("GITHUB_REPO", os.environ.get("GITHUB_REPO", "usk71
 def commit_to_github(file_path, file_content_str, commit_message):
     """アプリ上で変更されたJSONファイルをGitHubへ自動コミットする関数"""
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        return False # トークン未設定時はローカル保存のみ
+        return False
     
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{file_path}"
     headers = {
@@ -43,7 +43,6 @@ def commit_to_github(file_path, file_content_str, commit_message):
         "Accept": "application/vnd.github+json"
     }
     
-    # 1. 既存ファイルのSHAを取得（更新に必要）
     sha = None
     try:
         res = requests.get(url, headers=headers)
@@ -52,10 +51,8 @@ def commit_to_github(file_path, file_content_str, commit_message):
     except:
         pass
         
-    # 2. Base64エンコード
     content_encoded = base64.b64encode(file_content_str.encode("utf-8")).decode("utf-8")
     
-    # 3. GitHubへPUTリクエスト
     data = {
         "message": commit_message,
         "content": content_encoded,
@@ -67,9 +64,7 @@ def commit_to_github(file_path, file_content_str, commit_message):
     except:
         return False
 
-# バックアップ保存関数の定義
 def save_to_deleted_backup(item_type, target_id, target_data):
-    """削除されたデータをバックアップファイルに蓄積・同期する"""
     backup_data = {"deleted_history": []}
     if os.path.exists(BACKUP_JSON_FILE):
         try:
@@ -92,7 +87,6 @@ def save_to_deleted_backup(item_type, target_id, target_data):
         
     commit_to_github(BACKUP_JSON_FILE, backup_str, f"Backup deleted {item_type}: {target_id}")
 
-# 管理者リストのロード・セーブ
 def load_admins():
     admins_dict = {MASTER_ADMIN: {"role": "master", "appointed_by": None, "name": "内藤祐介"}}
     if os.path.exists(ADMINS_JSON_FILE):
@@ -124,7 +118,6 @@ def save_admins(admins_dict):
         f.write(content_str)
     commit_to_github(ADMINS_JSON_FILE, content_str, "Auto-update admins.json from app")
 
-# 会員リストのロード・セーブ
 def load_association_members_json():
     members_dict = {MASTER_ADMIN: "内藤 祐介"}
     if os.path.exists(MEMBERS_JSON_FILE):
@@ -154,7 +147,6 @@ def get_user_display_name(email, email_to_name, admins_dict):
         return admins_dict[e_low]["name"]
     return email_to_name.get(e_low, email)
 
-# 成績JSONのロード・セーブ
 def load_exam_results():
     if os.path.exists(RESULTS_JSON_FILE):
         try:
@@ -202,7 +194,7 @@ def load_exam_data():
 df_questions = load_exam_data()
 
 # ==========================================
-# 4. 認証・ログイン状態の管理（厳格ガード仕様）
+# 4. 認証・ログイン状態の管理
 # ==========================================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -691,12 +683,23 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
         st.subheader("👥 協会会員のアプリ利用状況・認証状況（永続記録）")
         storage_data = st.session_state.app_storage
         all_history = storage_data.get("exam_history", [])
+        activity_history = storage_data.get("activity_history", [])
         logged_in_users_list = storage_data.get("logged_in_users", [])
         
-        user_exams_map = {h.get("user_email"): [] for h in all_history}
+        user_exams_map = {}
         for h in all_history:
-            user_exams_map[h.get("user_email")].append(h)
+            u_email = h.get("user_email")
+            if u_email not in user_exams_map:
+                user_exams_map[u_email] = []
+            user_exams_map[u_email].append(h)
             
+        user_logins_map = {}
+        for act in activity_history:
+            u_email = act.get("user_email")
+            if u_email not in user_logins_map:
+                user_logins_map[u_email] = []
+            user_logins_map[u_email].append(act.get("timestamp"))
+
         active_users_set = set(logged_in_users_list).union(set(user_exams_map.keys())).union(set(registered_admins))
         total_members_count = len(member_emails)
         logged_in_count = sum(1 for m in member_emails if m in active_users_set)
@@ -706,28 +709,83 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
         col_st2.metric("利用実績あり（ログイン済）", f"{logged_in_count} 名")
         col_st3.metric("未利用", f"{total_members_count - logged_in_count} 名")
         
+        st.markdown("---")
+        st.write("**📋 全会員の利用状況・直近のテスト受験履歴（過去2回分）:**")
+        
         member_status_list = []
         for m_email in member_emails:
             m_name = email_to_name.get(m_email, "登録名なし")
             is_active = m_email in active_users_set or m_email == current_user
             status_str = "✅ ログイン済（実績あり）" if is_active else "⏳ 未ログイン"
-            member_status_list.append({"氏名": m_name, "メールアドレス": m_email, "ステータス": status_str})
-        st.dataframe(pd.DataFrame(member_status_list), use_container_width=True, hide_index=True)
+            
+            u_logins = user_logins_map.get(m_email, [])
+            last_login = max(u_logins) if u_logins else ("ログイン実績あり" if is_active and not u_logins else "-")
+            
+            u_hist = user_exams_map.get(m_email, [])
+            u_hist_sorted = sorted(u_hist, key=lambda x: x.get("timestamp", ""), reverse=True)
+            recent_2 = u_hist_sorted[:2]
+            
+            history_str_1 = f"1回前: {recent_2[0]['timestamp']} ({recent_2[0]['exam_type']} / 正答率: {recent_2[0]['rate']}%)" if len(recent_2) > 0 else "履歴なし"
+            history_str_2 = f"2回前: {recent_2[1]['timestamp']} ({recent_2[1]['exam_type']} / 正答率: {recent_2[1]['rate']}%)" if len(recent_2) > 1 else "-"
+            
+            member_status_list.append({
+                "氏名": m_name,
+                "メールアドレス": m_email,
+                "ステータス": status_str,
+                "直近のログイン日時": last_login,
+                "直近の受験① (最新)": history_str_1,
+                "直近の受験②": history_str_2
+            })
+            
+        df_member_status = pd.DataFrame(member_status_list)
+        status_table_height = (len(df_member_status) + 1) * 40 + 10
+        st.dataframe(df_member_status, use_container_width=True, hide_index=True, height=status_table_height)
 
     with tab4:
         st.subheader("📊 登録ユーザー別 成績レポート")
         storage = st.session_state.app_storage
         history = storage.get("exam_history", [])
         known_users = sorted(list(set([h["user_email"] for h in history] + member_emails)))
+        
         if known_users:
             user_options = {get_user_display_name(u, email_to_name, admins_dict): u for u in known_users}
             selected_display_name = st.selectbox("ユーザーを選択", list(user_options.keys()))
             selected_user = user_options[selected_display_name]
+            
             user_history = [h for h in history if h["user_email"] == selected_user]
+            
             if user_history:
-                st.dataframe(pd.DataFrame(user_history), use_container_width=True)
+                # ユーザーの成績表を日本語化し、メールアドレスを非表示にする
+                report_list = []
+                for h in sorted(user_history, key=lambda x: x.get("timestamp", ""), reverse=True):
+                    exam_type = h.get("exam_type", "演習")
+                    rate = h.get("rate", 0)
+                    
+                    # 同一ユーザーの過去の同種テストの平均正解率を計算
+                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type") == exam_type]
+                    avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
+                    
+                    # 前回（1回前）の正解率
+                    prev_rates = [item["rate"] for item in sorted(user_history, key=lambda x: x.get("timestamp", "")) if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp")]
+                    prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
+
+                    report_list.append({
+                        "日時": h.get("timestamp"),
+                        "受講テスト種類": exam_type,
+                        "正解数": h.get("score"),
+                        "総問題数": h.get("total"),
+                        "今回の正解率(%)": f"{rate}%",
+                        "前回の正解率": prev_rate_str,
+                        "平均正解率": f"{avg_rate:.1f}%",
+                        "合否判定": "合格 🏆" if h.get("passed") else "不合格 💥"
+                    })
+                
+                df_report = pd.DataFrame(report_list)
+                st.dataframe(df_report, use_container_width=True, hide_index=True)
             else:
-                st.info("受験履歴がありません。")
+                st.info("選択されたユーザーの受験履歴はまだありません。")
+        else:
+            st.info("登録されているユーザーがありません。")
 
     with tab5:
         st.subheader("⚙️ 成績データの個別管理 & 問題データExcel更新・バックアップ")
