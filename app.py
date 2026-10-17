@@ -550,10 +550,14 @@ if app_mode == "📝 問題演習・模擬テスト":
                             user_inc_list.append(inc_idx)
                 
                 test_name_label = st.session_state.get("selected_category_name", "演習・テスト")
+                is_mock = "本番模擬試験" in test_name_label
+                pass_criteria = 0.8 if "二等" in test_name_label else 0.9 if "一等" in test_name_label else 0.8
+                
                 new_record = {
                     "timestamp": now_str, "user_email": current_user, "exam_type": test_name_label,
                     "score": score, "total": total, "rate": round((score / total * 100), 1) if total > 0 else 0,
-                    "passed": (score / total >= 0.8) if total > 0 else False
+                    "passed": (score / total >= pass_criteria) if (total > 0 and is_mock) else False,
+                    "is_mock": is_mock
                 }
                 if "exam_history" not in storage:
                     storage["exam_history"] = []
@@ -740,7 +744,8 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
             u_hist = user_exams_map.get(m_email, [])
             u_hist_sorted = sorted(u_hist, key=lambda x: x.get("timestamp", ""), reverse=True)
             
-            history_str_1 = f"{u_hist_sorted[0]['exam_type']} (正答率: {u_hist_sorted[0]['rate']}%)" if len(u_hist_sorted) > 0 else "履歴なし"
+            # 正答率を含めず、テスト名のみを表示
+            history_str_1 = f"{u_hist_sorted[0]['exam_type']}" if len(u_hist_sorted) > 0 else "履歴なし"
             
             member_status_list.append({
                 "氏名": m_name,
@@ -773,7 +778,7 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     exam_type = h.get("exam_type", "演習")
                     rate = h.get("rate", 0)
                     
-                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type") == exam_type]
+                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type"] == exam_type]
                     avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
                     
                     sorted_user_history = sorted(user_history, key=lambda x: x.get("timestamp", ""))
@@ -784,6 +789,13 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     
                     prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
 
+                    # 本番模試の場合のみ合否判定を表示し、カテゴリー演習の場合は「-」にする
+                    is_mock = h.get("is_mock", False) or ("本番模擬試験" in exam_type)
+                    if is_mock:
+                        pass_text = "合格 🏆" if h.get("passed") else "不合格 💥"
+                    else:
+                        pass_text = "-（対象外）"
+
                     report_list.append({
                         "日時": h.get("timestamp"),
                         "受講テスト種類": exam_type,
@@ -792,7 +804,7 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                         "今回の正解率(%)": f"{rate}%",
                         "前回の正解率": prev_rate_str,
                         "平均正解率": f"{avg_rate:.1f}%",
-                        "合否判定": "合格 🏆" if h.get("passed") else "不合格 💥"
+                        "合否判定": pass_text
                     })
                 
                 df_report = pd.DataFrame(report_list)
