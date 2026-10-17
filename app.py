@@ -201,53 +201,66 @@ if "logged_in" not in st.session_state:
 if "user_email" not in st.session_state:
     st.session_state.user_email = ""
 
-st.sidebar.markdown("<p style='font-size:12px; font-weight:bold; color:#ff4b4b; margin-bottom:0px;'>一般社団法人 東京多摩ドローン協会</p>", unsafe_allow_html=True)
-st.sidebar.title("🚁 ドローン国家資格 対策アプリ")
-st.sidebar.markdown("---")
-
 email_to_name = load_association_members_json()
 member_emails = list(email_to_name.keys())
 admins_dict = load_admins()
 registered_admins = list(admins_dict.keys())
 
+# --- 未ログイン時のメイン画面（中央エリアにログインフォームを表示） ---
 if not st.session_state.logged_in:
-    st.sidebar.subheader("ログイン / 会員認証")
-    input_email = st.sidebar.text_input("メールアドレスを入力", placeholder="user@example.com")
+    st.markdown("<p style='font-size:14px; font-weight:bold; color:#ff4b4b;'>一般社団法人 東京多摩ドローン協会</p>", unsafe_allow_html=True)
+    st.title("🚁 ドローン国家資格 対策プラットフォーム")
+    st.markdown("---")
     
-    if st.sidebar.button("ログイン"):
-        input_email = input_email.strip().lower()
-        if input_email and "@" in input_email:
-            if input_email in registered_admins or input_email in member_emails:
-                st.session_state.logged_in = True
-                st.session_state.user_email = input_email
-                
-                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                storage = st.session_state.app_storage
-                if "activity_history" not in storage:
-                    storage["activity_history"] = []
-                if "logged_in_users" not in storage:
-                    storage["logged_in_users"] = []
-                
-                if input_email not in storage["logged_in_users"]:
-                    storage["logged_in_users"].append(input_email)
-                
-                storage["activity_history"].append({
-                    "timestamp": now_str,
-                    "user_email": input_email,
-                    "action": "ログイン",
-                    "details": "システムログイン"
-                })
-                save_exam_results(storage)
-                
-                st.session_state.last_system_msg = "ログイン成功"
-                st.success("ログインしました！")
-                st.rerun()
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.subheader("🔐 会員ログイン / 認証")
+        st.write("ご登録済みのメールアドレスを入力してログインしてください。")
+        
+        input_email = st.text_input("メールアドレスを入力", placeholder="user@example.com", key="login_email_input_main")
+        
+        if st.button("ログインする", key="login_btn_main", use_container_width=True):
+            input_email = input_email.strip().lower()
+            if input_email and "@" in input_email:
+                if input_email in registered_admins or input_email in member_emails:
+                    st.session_state.logged_in = True
+                    st.session_state.user_email = input_email
+                    
+                    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    storage = st.session_state.app_storage
+                    if "activity_history" not in storage:
+                        storage["activity_history"] = []
+                    if "logged_in_users" not in storage:
+                        storage["logged_in_users"] = []
+                    
+                    if input_email not in storage["logged_in_users"]:
+                        storage["logged_in_users"].append(input_email)
+                    
+                    storage["activity_history"].append({
+                        "timestamp": now_str,
+                        "user_email": input_email,
+                        "action": "ログイン",
+                        "details": "システムログイン"
+                    })
+                    save_exam_results(storage)
+                    
+                    st.session_state.last_system_msg = "ログイン成功"
+                    st.success("ログインしました！まもなく画面が切り替わります...")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("❌ 登録されていないメールアドレスです。アクセスが拒否されました。")
             else:
-                st.sidebar.error("❌ 登録されていないメールアドレスです。アクセスが拒否されました。")
-        else:
-            st.sidebar.warning("有効なメールアドレスを入力してください。")
-            
+                st.warning("有効なメールアドレスを入力してください。")
+                
     st.stop()
+
+# ==========================================
+# 5. ログイン後のサイドバー表示
+# ==========================================
+st.sidebar.markdown("<p style='font-size:12px; font-weight:bold; color:#ff4b4b; margin-bottom:0px;'>一般社団法人 東京多摩ドローン協会</p>", unsafe_allow_html=True)
+st.sidebar.title("🚁 ドローン国家資格 対策アプリ")
+st.sidebar.markdown("---")
 
 current_user = st.session_state.user_email
 current_user_name = get_user_display_name(current_user, email_to_name, admins_dict)
@@ -264,9 +277,6 @@ st.sidebar.write(f"👤 ログイン中: `{current_user_name}`")
 if is_admin:
     st.sidebar.markdown("🛠️ **【管理者権限】**")
 
-# ==========================================
-# サイドバー: 成績確認
-# ==========================================
 with st.sidebar.expander("📊 あなたの成績・レポート確認", expanded=False):
     storage_sb = st.session_state.app_storage
     cat_stats_sb = storage_sb.get("category_stats", {}).get(current_user, {})
@@ -308,7 +318,7 @@ if st.sidebar.button("ログアウト"):
 st.sidebar.markdown("---")
 
 # ==========================================
-# 5. メイン画面のルーティング
+# 6. メイン画面のルーティング
 # ==========================================
 menu_options = ["📝 問題演習・模擬テスト"]
 if is_admin:
@@ -757,10 +767,10 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     exam_type = h.get("exam_type", "演習")
                     rate = h.get("rate", 0)
                     
-                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type") == exam_type]
+                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type"] == exam_type]
                     avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
                     
-                    prev_rates = [item["rate"] for item in sorted(user_history, key=lambda x: x.get("timestamp", "")) if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp")]
+                    prev_rates = [item["rate"] for item in sorted(user_history, key=lambda x: x.get("timestamp", "")) if item.get("exam_type"] == exam_type and item.get("timestamp") < h.get("timestamp")]
                     prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
 
                     report_list.append({
