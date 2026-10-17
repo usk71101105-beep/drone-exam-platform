@@ -710,7 +710,7 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
         col_st3.metric("未利用", f"{total_members_count - logged_in_count} 名")
         
         st.markdown("---")
-        st.write("**📋 全会員の利用状況・直近のテスト受験履歴（過去2回分）:**")
+        st.write("**📋 全会員の利用状況・直近のテスト受験履歴（最新1件）:**")
         
         member_status_list = []
         for m_email in member_emails:
@@ -723,18 +723,15 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
             
             u_hist = user_exams_map.get(m_email, [])
             u_hist_sorted = sorted(u_hist, key=lambda x: x.get("timestamp", ""), reverse=True)
-            recent_2 = u_hist_sorted[:2]
             
-            history_str_1 = f"1回前: {recent_2[0]['timestamp']} ({recent_2[0]['exam_type']} / 正答率: {recent_2[0]['rate']}%)" if len(recent_2) > 0 else "履歴なし"
-            history_str_2 = f"2回前: {recent_2[1]['timestamp']} ({recent_2[1]['exam_type']} / 正答率: {recent_2[1]['rate']}%)" if len(recent_2) > 1 else "-"
+            history_str_1 = f"{u_hist_sorted[0]['timestamp']} ({u_hist_sorted[0]['exam_type']} / 正答率: {u_hist_sorted[0]['rate']}%)" if len(u_hist_sorted) > 0 else "履歴なし"
             
             member_status_list.append({
                 "氏名": m_name,
                 "メールアドレス": m_email,
                 "ステータス": status_str,
                 "直近のログイン日時": last_login,
-                "直近の受験① (最新)": history_str_1,
-                "直近の受験②": history_str_2
+                "直近の受験① (最新)": history_str_1
             })
             
         df_member_status = pd.DataFrame(member_status_list)
@@ -755,17 +752,14 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
             user_history = [h for h in history if h["user_email"] == selected_user]
             
             if user_history:
-                # ユーザーの成績表を日本語化し、メールアドレスを非表示にする
                 report_list = []
                 for h in sorted(user_history, key=lambda x: x.get("timestamp", ""), reverse=True):
                     exam_type = h.get("exam_type", "演習")
                     rate = h.get("rate", 0)
                     
-                    # 同一ユーザーの過去の同種テストの平均正解率を計算
                     same_type_history = [item["rate"] for item in user_history if item.get("exam_type") == exam_type]
                     avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
                     
-                    # 前回（1回前）の正解率
                     prev_rates = [item["rate"] for item in sorted(user_history, key=lambda x: x.get("timestamp", "")) if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp")]
                     prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
 
