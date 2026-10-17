@@ -771,55 +771,60 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
         
         if known_users:
             user_options = {get_user_display_name(u, email_to_name, admins_dict): u for u in known_users}
-            selected_display_name = st.selectbox("ユーザーを選択", list(user_options.keys()))
-            selected_user = user_options[selected_display_name]
             
-            user_history = [h for h in history if h["user_email"] == selected_user]
+            # プレースホルダー（空白・未選択状態）を最初に追加
+            display_name_list = ["-- ユーザーを選択してください --"] + list(user_options.keys())
+            selected_display_name = st.selectbox("ユーザーを選択", display_name_list)
             
-            if user_history:
-                report_list = []
-                sorted_user_history_all = sorted(user_history, key=lambda x: x.get("timestamp", ""))
-                
-                for h in sorted(user_history, key=lambda x: x.get("timestamp", ""), reverse=True):
-                    exam_type = h.get("exam_type", "演習")
-                    rate = h.get("rate", 0)
-                    
-                    # --- 安全なループ処理に書き換え済 ---
-                    same_type_history = []
-                    for item in user_history:
-                        if item.get("exam_type") == exam_type:
-                            same_type_history.append(item["rate"])
-                    
-                    avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
-                    
-                    prev_rates = []
-                    for item in sorted_user_history_all:
-                        if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp"):
-                            prev_rates.append(item["rate"])
-                    
-                    prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
-
-                    is_mock = h.get("is_mock", False) or ("本番模擬試験" in exam_type)
-                    if is_mock:
-                        pass_text = "合格 🏆" if h.get("passed") else "不合格 💥"
-                    else:
-                        pass_text = "-（対象外）"
-
-                    report_list.append({
-                        "日時": h.get("timestamp"),
-                        "受講テスト種類": exam_type,
-                        "正解数": h.get("score"),
-                        "総問題数": h.get("total"),
-                        "今回の正解率(%)": f"{rate}%",
-                        "前回の正解率": prev_rate_str,
-                        "平均正解率": f"{avg_rate:.1f}%",
-                        "合否判定": pass_text
-                    })
-                
-                df_report = pd.DataFrame(report_list)
-                st.dataframe(df_report, use_container_width=True, hide_index=True)
+            if selected_display_name == "-- ユーザーを選択してください --":
+                st.info("👆 上のプルダウンからユーザーを選択してください。")
             else:
-                st.info("選択されたユーザーの受験履歴はまだありません。")
+                selected_user = user_options[selected_display_name]
+                user_history = [h for h in history if h["user_email"] == selected_user]
+                
+                if user_history:
+                    report_list = []
+                    sorted_user_history_all = sorted(user_history, key=lambda x: x.get("timestamp", ""))
+                    
+                    for h in sorted(user_history, key=lambda x: x.get("timestamp", ""), reverse=True):
+                        exam_type = h.get("exam_type", "演習")
+                        rate = h.get("rate", 0)
+                        
+                        same_type_history = []
+                        for item in user_history:
+                            if item.get("exam_type") == exam_type:
+                                same_type_history.append(item["rate"])
+                        
+                        avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
+                        
+                        prev_rates = []
+                        for item in sorted_user_history_all:
+                            if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp"):
+                                prev_rates.append(item["rate"])
+                        
+                        prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
+
+                        is_mock = h.get("is_mock", False) or ("本番模擬試験" in exam_type)
+                        if is_mock:
+                            pass_text = "合格 🏆" if h.get("passed") else "不合格 💥"
+                        else:
+                            pass_text = "-（対象外）"
+
+                        report_list.append({
+                            "日時": h.get("timestamp"),
+                            "受講テスト種類": exam_type,
+                            "正解数": h.get("score"),
+                            "総問題数": h.get("total"),
+                            "今回の正解率(%)": f"{rate}%",
+                            "前回の正解率": prev_rate_str,
+                            "平均正解率": f"{avg_rate:.1f}%",
+                            "合否判定": pass_text
+                        })
+                    
+                    df_report = pd.DataFrame(report_list)
+                    st.dataframe(df_report, use_container_width=True, hide_index=True)
+                else:
+                    st.info("選択されたユーザーの受験履歴はまだありません。")
         else:
             st.info("登録されているユーザーがありません。")
 
