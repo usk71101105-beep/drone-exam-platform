@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# 2. GitHub自動同期 & 永続化・バックアップ管理
+# 2. GitHub自動同期 & 堅牢なデータ永続化・バックアップ管理
 # ==========================================
 MASTER_ADMIN = "usk71101105@gmail.com"
 RESULTS_JSON_FILE = "exam_results.json"
@@ -99,7 +99,7 @@ def load_admins():
         try:
             with open(ADMINS_JSON_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if isinstance(data, dict):
+                if isinstance(data, dict) and len(data) > 0:
                     for k, v in data.items():
                         k_clean = str(k).strip().lower()
                         if k_clean:
@@ -114,6 +114,21 @@ def load_admins():
                             admins_dict[a_clean] = {"role": "admin", "appointed_by": MASTER_ADMIN, "name": ""}
         except:
             pass
+            
+    # セーフガード: 万が一ファイルが空っぽで読み込まれた場合、手動バックアップの最新から自動復旧を試みる
+    if len(admins_dict) <= 1 and os.path.exists(MANUAL_BACKUP_JSON_FILE):
+        try:
+            with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
+                m_data = json.load(f)
+            m_list = m_data.get("manual_backups", [])
+            if m_list:
+                latest_backup = m_list[-1]
+                saved_admins = latest_backup.get("admins", {})
+                if isinstance(saved_admins, dict) and len(saved_admins) > 0:
+                    admins_dict = saved_admins
+        except:
+            pass
+
     if MASTER_ADMIN not in admins_dict:
         admins_dict[MASTER_ADMIN] = {"role": "master", "appointed_by": None, "name": "内藤祐介"}
     return admins_dict
@@ -130,13 +145,28 @@ def load_association_members_json():
         try:
             with open(MEMBERS_JSON_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if isinstance(data, dict):
+                if isinstance(data, dict) and len(data) > 0:
                     for k, v in data.items():
                         k_clean = str(k).strip().lower()
                         if k_clean:
                             members_dict[k_clean] = str(v).strip()
         except:
             pass
+            
+    # セーフガード: ファイルが空の場合、手動バックアップから自動復旧
+    if len(members_dict) <= 1 and os.path.exists(MANUAL_BACKUP_JSON_FILE):
+        try:
+            with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
+                m_data = json.load(f)
+            m_list = m_data.get("manual_backups", [])
+            if m_list:
+                latest_backup = m_list[-1]
+                saved_members = latest_backup.get("members", {})
+                if isinstance(saved_members, dict) and len(saved_members) > 0:
+                    members_dict = saved_members
+        except:
+            pass
+
     if MASTER_ADMIN not in members_dict:
         members_dict[MASTER_ADMIN] = "内藤 祐介"
     return members_dict
@@ -154,6 +184,7 @@ def get_user_display_name(email, email_to_name, admins_dict):
     return email_to_name.get(e_low, email)
 
 def load_exam_results():
+    res_data = {"exam_history": [], "category_stats": {}, "incorrect_pool": {}, "activity_history": [], "logged_in_users": []}
     if os.path.exists(RESULTS_JSON_FILE):
         try:
             with open(RESULTS_JSON_FILE, "r", encoding="utf-8") as f:
@@ -163,12 +194,27 @@ def load_exam_results():
                         data["activity_history"] = []
                     if "logged_in_users" not in data:
                         data["logged_in_users"] = []
-                    return data
+                    res_data = data
                 elif isinstance(data, list):
-                    return {"exam_history": data, "category_stats": {}, "incorrect_pool": {}, "activity_history": [], "logged_in_users": []}
+                    res_data["exam_history"] = data
         except:
             pass
-    return {"exam_history": [], "category_stats": {}, "incorrect_pool": {}, "activity_history": [], "logged_in_users": []}
+            
+    # セーフガード: 成績データが空で手動バックアップがある場合、自動修復
+    if len(res_data.get("exam_history", [])) == 0 and os.path.exists(MANUAL_BACKUP_JSON_FILE):
+        try:
+            with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
+                m_data = json.load(f)
+            m_list = m_data.get("manual_backups", [])
+            if m_list:
+                latest_backup = m_list[-1]
+                saved_res = latest_backup.get("exam_results", {})
+                if isinstance(saved_res, dict) and len(saved_res.get("exam_history", [])) > 0:
+                    res_data = saved_res
+        except:
+            pass
+
+    return res_data
 
 def save_exam_results(data):
     content_str = json.dumps(data, ensure_ascii=False, indent=2)
@@ -772,7 +818,6 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
         if known_users:
             user_options = {get_user_display_name(u, email_to_name, admins_dict): u for u in known_users}
             
-            # 入力検索可能な selectbox (プレースホルダーを空文字列にするとタイピング検索しやすくなります)
             display_name_list = [""] + list(user_options.keys())
             selected_display_name = st.selectbox(
                 "ユーザーを検索・選択（名前を入力すると絞り込めます）",
@@ -803,7 +848,7 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                         
                         prev_rates = []
                         for item in sorted_user_history_all:
-                            if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp"):
+                            if item.get("exam_type"] == exam_type and item.get("timestamp") < h.get("timestamp"):
                                 prev_rates.append(item["rate"])
                         
                         prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
