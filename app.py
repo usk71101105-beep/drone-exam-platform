@@ -26,6 +26,7 @@ RESULTS_JSON_FILE = "exam_results.json"
 ADMINS_JSON_FILE = "admins.json"
 MEMBERS_JSON_FILE = "members.json"
 BACKUP_JSON_FILE = "deleted_backup_history.json"
+MANUAL_BACKUP_JSON_FILE = "manual_backup_history.json"
 EXCEL_FILENAME = "drone_exam_questions_detailed_calc.xlsx"
 
 # GitHub Secretsから認証情報を取得（未設定の場合はローカル動作）
@@ -739,7 +740,6 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
             u_hist = user_exams_map.get(m_email, [])
             u_hist_sorted = sorted(u_hist, key=lambda x: x.get("timestamp", ""), reverse=True)
             
-            # 日時を省き、テスト名と正答率のみを表示
             history_str_1 = f"{u_hist_sorted[0]['exam_type']} (正答率: {u_hist_sorted[0]['rate']}%)" if len(u_hist_sorted) > 0 else "履歴なし"
             
             member_status_list.append({
@@ -773,12 +773,12 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     exam_type = h.get("exam_type", "演習")
                     rate = h.get("rate", 0)
                     
-                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type") == exam_type]
+                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type"] == exam_type]
                     avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
                     
                     prev_rates = [
                         item["rate"] for item in sorted(user_history, key=lambda x: x.get("timestamp", "")) 
-                        if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp")
+                        if item.get("exam_type"] == exam_type and item.get("timestamp"] < h.get("timestamp")
                     ]
                     prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
 
@@ -802,6 +802,79 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
 
     with tab5:
         st.subheader("⚙️ 成績データの個別管理 & 問題データExcel更新・バックアップ")
+        
+        # --- 手動バックアップ機能の追加 ---
+        st.markdown("### 💾 システム手動バックアップ（都度追加形式）")
+        st.write("現在の全データ（会員リスト、管理者リスト、成績・テスト履歴など）を手動でバックアップし、追加保存します。")
+        
+        if st.button("💾 現在のデータを手動バックアップする", key="manual_backup_btn"):
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            manual_backup_data = {"manual_backups": []}
+            if os.path.exists(MANUAL_BACKUP_JSON_FILE):
+                try:
+                    with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
+                        manual_backup_data = json.load(f)
+                except:
+                    pass
+            
+            snapshot = {
+                "timestamp": now_str,
+                "members": load_association_members_json(),
+                "admins": load_admins(),
+                "exam_results": load_exam_results()
+            }
+            
+            manual_backup_data["manual_backups"].append(snapshot)
+            
+            content_str = json.dumps(manual_backup_data, ensure_ascii=False, indent=2)
+            with open(MANUAL_BACKUP_JSON_FILE, "w", encoding="utf-8") as f:
+                f.write(content_str)
+            commit_to_github(MANUAL_BACKUP_JSON_FILE, content_str, f"Manual backup created at {now_str}")
+            
+            st.success(f"🎉 手動バックアップを作成しました ({now_str})！")
+            time.sleep(1)
+            st.rerun()
+
+        st.markdown("---")
+        st.subheader("🔄 手動バックアップからの復元（ロールバック）")
+        
+        if os.path.exists(MANUAL_BACKUP_JSON_FILE):
+            try:
+                with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
+                    m_data = json.load(f)
+                m_list = m_data.get("manual_backups", [])
+                
+                if m_list:
+                    st.write("保存されている手動バックアップ一覧です。復元したいデータを選択してください。")
+                    
+                    backup_options = {f"バックアップ日時: {b['timestamp']} (会員数: {len(b.get('members', {}))}名)": idx for idx, b in enumerate(m_list)}
+                    selected_backup_label = st.selectbox("復元するバックアップを選択", list(backup_options.keys()), key="rollback_select")
+                    selected_idx = backup_options[selected_backup_label]
+                    selected_snapshot = m_list[selected_idx]
+                    
+                    confirm_rollback = st.checkbox("⚠️ 選択したバックアップデータにシステムの状態を戻すことに同意します（現在の最新データは上書きされます）", key="confirm_rollback_chk")
+                    
+                    if confirm_rollback:
+                        if st.button("🔄 選択したバックアップデータを復元する", key="execute_rollback_btn"):
+                            # データの復元とファイル保存
+                            save_association_members_json(selected_snapshot.get("members", {}))
+                            save_admins(selected_snapshot.get("admins", {}))
+                            save_exam_results(selected_snapshot.get("exam_results", {}))
+                            
+                            st.session_state.app_storage = selected_snapshot.get("exam_results", {})
+                            st.success(f"🎉 バックアップ（{selected_snapshot['timestamp']}）から正常に復元しました！まもなく画面が更新されます...")
+                            time.sleep(1.5)
+                            st.rerun()
+                else:
+                    st.info("保存されている手動バックアップはありません。上のボタンから作成してください。")
+            except Exception as e:
+                st.error(f"バックアップファイルの読み込みに失敗しました: {e}")
+        else:
+            st.info("手動バックアップ履歴はありません。")
+
+        st.markdown("---")
+        st.subheader("📂 問題データ（Excel）の更新")
         uploaded_file = st.file_uploader("新しい問題データ（Excel .xlsx）をアップロード", type=["xlsx"], key="excel_uploader")
         if uploaded_file is not None:
             with open(EXCEL_FILENAME, "wb") as f:
