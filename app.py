@@ -773,13 +773,15 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     exam_type = h.get("exam_type", "演習")
                     rate = h.get("rate", 0)
                     
-                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type"] == exam_type]
+                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type") == exam_type]
                     avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
                     
-                    prev_rates = [
-                        item["rate"] for item in sorted(user_history, key=lambda x: x.get("timestamp", "")) 
-                        if item.get("exam_type"] == exam_type and item.get("timestamp"] < h.get("timestamp")
-                    ]
+                    sorted_user_history = sorted(user_history, key=lambda x: x.get("timestamp", ""))
+                    prev_rates = []
+                    for item in sorted_user_history:
+                        if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp"):
+                            prev_rates.append(item["rate"])
+                    
                     prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
 
                     report_list.append({
@@ -857,7 +859,6 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                     
                     if confirm_rollback:
                         if st.button("🔄 選択したバックアップデータを復元する", key="execute_rollback_btn"):
-                            # データの復元とファイル保存
                             save_association_members_json(selected_snapshot.get("members", {}))
                             save_admins(selected_snapshot.get("admins", {}))
                             save_exam_results(selected_snapshot.get("exam_results", {}))
