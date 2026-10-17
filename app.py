@@ -744,7 +744,6 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
             u_hist = user_exams_map.get(m_email, [])
             u_hist_sorted = sorted(u_hist, key=lambda x: x.get("timestamp", ""), reverse=True)
             
-            # 正答率を含めず、テスト名のみを表示
             history_str_1 = f"{u_hist_sorted[0]['exam_type']}" if len(u_hist_sorted) > 0 else "履歴なし"
             
             member_status_list.append({
@@ -774,22 +773,22 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
             
             if user_history:
                 report_list = []
+                sorted_user_history_all = sorted(user_history, key=lambda x: x.get("timestamp", ""))
+                
                 for h in sorted(user_history, key=lambda x: x.get("timestamp", ""), reverse=True):
                     exam_type = h.get("exam_type", "演習")
                     rate = h.get("rate", 0)
                     
-                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type"] == exam_type]
+                    same_type_history = [item["rate"] for item in user_history if item.get("exam_type") == exam_type]
                     avg_rate = sum(same_type_history) / len(same_type_history) if same_type_history else rate
                     
-                    sorted_user_history = sorted(user_history, key=lambda x: x.get("timestamp", ""))
                     prev_rates = []
-                    for item in sorted_user_history:
+                    for item in sorted_user_history_all:
                         if item.get("exam_type") == exam_type and item.get("timestamp") < h.get("timestamp"):
                             prev_rates.append(item["rate"])
                     
                     prev_rate_str = f"{prev_rates[-1]}%" if prev_rates else "初回"
 
-                    # 本番模試の場合のみ合否判定を表示し、カテゴリー演習の場合は「-」にする
                     is_mock = h.get("is_mock", False) or ("本番模擬試験" in exam_type)
                     if is_mock:
                         pass_text = "合格 🏆" if h.get("passed") else "不合格 💥"
@@ -817,7 +816,6 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
     with tab5:
         st.subheader("⚙️ 成績データの個別管理 & 問題データExcel更新・バックアップ")
         
-        # --- 手動バックアップ機能の追加 ---
         st.markdown("### 💾 システム手動バックアップ（都度追加形式）")
         st.write("現在の全データ（会員リスト、管理者リスト、成績・テスト履歴など）を手動でバックアップし、追加保存します。")
         
