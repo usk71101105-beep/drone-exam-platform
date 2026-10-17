@@ -772,12 +772,16 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
         if known_users:
             user_options = {get_user_display_name(u, email_to_name, admins_dict): u for u in known_users}
             
-            # プレースホルダー（空白・未選択状態）を最初に追加
-            display_name_list = ["-- ユーザーを選択してください --"] + list(user_options.keys())
-            selected_display_name = st.selectbox("ユーザーを選択", display_name_list)
+            # 入力検索可能な selectbox (プレースホルダーを空文字列にするとタイピング検索しやすくなります)
+            display_name_list = [""] + list(user_options.keys())
+            selected_display_name = st.selectbox(
+                "ユーザーを検索・選択（名前を入力すると絞り込めます）",
+                display_name_list,
+                format_func=lambda x: "-- ユーザーを検索・選択してください --" if x == "" else x
+            )
             
-            if selected_display_name == "-- ユーザーを選択してください --":
-                st.info("👆 上のプルダウンからユーザーを選択してください。")
+            if selected_display_name == "":
+                st.info("👆 上のボックスに名前を入力して検索するか、プルダウンから選択してください。")
             else:
                 selected_user = user_options[selected_display_name]
                 user_history = [h for h in history if h["user_email"] == selected_user]
