@@ -614,19 +614,20 @@ if app_mode == "📝 問題演習・模擬テスト":
                     storage["exam_history"] = []
                 storage["exam_history"].append(new_record)
                 
-                if not st.session_state.get("exam_mode"):
-                    if "category_stats" not in storage:
-                        storage["category_stats"] = {}
-                    if current_user not in storage["category_stats"]:
-                        storage["category_stats"][current_user] = {}
-                    user_cat_stats = storage["category_stats"][current_user]
-                    for cat, res in session_results.items():
-                        if cat not in user_cat_stats:
-                            user_cat_stats[cat] = {"total": 0, "correct": 0, "last_total": 0, "last_correct": 0}
-                        user_cat_stats[cat]["last_total"] = res["total"]
-                        user_cat_stats[cat]["last_correct"] = res["correct"]
-                        user_cat_stats[cat]["total"] += res["total"]
-                        user_cat_stats[cat]["correct"] += res["correct"]
+                # 【修正】本番模試や弱点克服、コース全体ランダム演習を含むすべてのテストで、解いた問題のカテゴリー別に正誤を蓄積・集計する
+                if "category_stats" not in storage:
+                    storage["category_stats"] = {}
+                if current_user not in storage["category_stats"]:
+                    storage["category_stats"][current_user] = {}
+                user_cat_stats = storage["category_stats"][current_user]
+                
+                for cat, res in session_results.items():
+                    if cat not in user_cat_stats:
+                        user_cat_stats[cat] = {"total": 0, "correct": 0, "last_total": 0, "last_correct": 0}
+                    user_cat_stats[cat]["last_total"] = res["total"]
+                    user_cat_stats[cat]["last_correct"] = res["correct"]
+                    user_cat_stats[cat]["total"] += res["total"]
+                    user_cat_stats[cat]["correct"] += res["correct"]
                 
                 save_exam_results(storage)
                 st.session_state.submitted = True
