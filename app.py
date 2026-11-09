@@ -24,6 +24,7 @@ st.set_page_config(
 MASTER_ADMIN = "usk71101105@gmail.com"
 RESULTS_JSON_FILE = "exam_results.json"
 ADMINS_JSON_FILE = "admins.json"
+ADMIN_BACKUP_JSON_FILE = "admin_backup.json"  # 🆕 管理者専用バックアップファイル
 MEMBERS_JSON_FILE = "members.json"
 BACKUP_JSON_FILE = "deleted_backup_history.json"
 MANUAL_BACKUP_JSON_FILE = "manual_backup_history.json"
@@ -115,7 +116,18 @@ def load_admins():
         except:
             pass
             
-    # セーフガード: 万が一ファイルが空っぽの場合、手動バックアップから自動復旧を試みる
+    # セーフガード1: admin_backup.jsonからの自動復旧
+    if len(admins_dict) <= 1 and os.path.exists(ADMIN_BACKUP_JSON_FILE):
+        try:
+            with open(ADMIN_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
+                b_data = json.load(f)
+            saved_admins = b_data.get("admins", {})
+            if isinstance(saved_admins, dict) and len(saved_admins) > 0:
+                admins_dict = saved_admins
+        except:
+            pass
+
+    # セーフガード2: 手動バックアップからの自動復旧
     if len(admins_dict) <= 1 and os.path.exists(MANUAL_BACKUP_JSON_FILE):
         try:
             with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
@@ -153,7 +165,6 @@ def load_association_members_json():
         except:
             pass
             
-    # セーフガード: ファイルが空の場合、手動バックアップから自動復旧
     if len(members_dict) <= 1 and os.path.exists(MANUAL_BACKUP_JSON_FILE):
         try:
             with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
@@ -200,7 +211,6 @@ def load_exam_results():
         except:
             pass
             
-    # セーフガード: 成績データが空の場合、手動バックアップから自動修復
     if len(res_data.get("exam_history", [])) == 0 and os.path.exists(MANUAL_BACKUP_JSON_FILE):
         try:
             with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
@@ -614,7 +624,6 @@ if app_mode == "📝 問題演習・模擬テスト":
                     storage["exam_history"] = []
                 storage["exam_history"].append(new_record)
                 
-                # 全モード共通でのカテゴリー別成績集計
                 if "category_stats" not in storage:
                     storage["category_stats"] = {}
                 if current_user not in storage["category_stats"]:
@@ -885,10 +894,49 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
     with tab5:
         st.subheader("⚙️ 成績データの個別管理 & 問題データExcel更新・バックアップ")
         
-        st.markdown("### 💾 システム手動バックアップ（都度追加形式）")
+        # 🆕 管理者専用のバックアップ・読み込み機能セクション
+        st.markdown("### 👑 管理者専用バックアップ & 復元")
+        st.write("現在の管理者リストのみを抽出して個別バックアップ（`admin_backup.json`）を作成したり、そのファイルから復元できます。")
+        
+        col_ab1, col_ab2 = st.columns(2)
+        with col_ab1:
+            if st.button("🛡️ 管理者専用バックアップを作成する", key="create_admin_backup_btn"):
+                now_str = get_jst_now_str()
+                current_admins = load_admins()
+                admin_backup_payload = {
+                    "timestamp": now_str,
+                    "admins": current_admins
+                }
+                content_str = json.dumps(admin_backup_payload, ensure_ascii=False, indent=2)
+                with open(ADMIN_BACKUP_JSON_FILE, "w", encoding="utf-8") as f:
+                    f.write(content_str)
+                commit_to_github(ADMIN_BACKUP_JSON_FILE, content_str, f"Admin specific backup created at {now_str}")
+                st.success(f"🎉 管理者専用バックアップファイル (`{ADMIN_BACKUP_JSON_FILE}`) を作成しました！")
+        
+        with col_ab2:
+            if os.path.exists(ADMIN_BACKUP_JSON_FILE):
+                if st.button("📥 管理者専用バックアップから読み込んで復元", key="restore_admin_backup_btn"):
+                    try:
+                        with open(ADMIN_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
+                            b_data = json.load(f)
+                        restored_admins = b_data.get("admins", {})
+                        if isinstance(restored_admins, dict) and len(restored_admins) > 0:
+                            save_admins(restored_admins)
+                            st.success("🎉 管理者専用バックアップから正常に復元しました！まもなく画面が更新されます...")
+                            time.sleep(1.5)
+                            st.rerun()
+                        else:
+                            st.warning("バックアップ内の管理者データが空か形式が不正です。")
+                    except Exception as e:
+                        st.error(f"読み込みエラー: {e}")
+            else:
+                st.info("管理者専用バックアップファイルはまだありません。左のボタンで作成してください。")
+
+        st.markdown("---")
+        st.markdown("### 💾 システム手動バックアップ（全データ一括）")
         st.write("現在の全データ（会員リスト、管理者リスト、成績・テスト履歴など）を手動でバックアップし、追加保存します。")
         
-        if st.button("💾 現在のデータを手動バックアップする", key="manual_backup_btn"):
+        if st.button("💾 現在の全データを手動バックアップする", key="manual_backup_btn"):
             now_str = get_jst_now_str()
             
             manual_backup_data = {"manual_backups": []}
@@ -917,7 +965,7 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
             st.rerun()
 
         st.markdown("---")
-        st.subheader("🔄 手動バックアップからの復元（ロールバック）")
+        st.subheader("🔄 全データ手動バックアップからの復元（ロールバック）")
         
         if os.path.exists(MANUAL_BACKUP_JSON_FILE):
             try:
