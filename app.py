@@ -115,7 +115,7 @@ def load_admins():
         except:
             pass
             
-    # セーフガード: 万が一ファイルが空っぽで読み込まれた場合、手動バックアップの最新から自動復旧を試みる
+    # セーフガード: 万が一ファイルが空っぽの場合、手動バックアップから自動復旧を試みる
     if len(admins_dict) <= 1 and os.path.exists(MANUAL_BACKUP_JSON_FILE):
         try:
             with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
@@ -200,7 +200,7 @@ def load_exam_results():
         except:
             pass
             
-    # セーフガード: 成績データが空で手動バックアップがある場合、自動修復
+    # セーフガード: 成績データが空の場合、手動バックアップから自動修復
     if len(res_data.get("exam_history", [])) == 0 and os.path.exists(MANUAL_BACKUP_JSON_FILE):
         try:
             with open(MANUAL_BACKUP_JSON_FILE, "r", encoding="utf-8") as f:
@@ -258,7 +258,7 @@ member_emails = list(email_to_name.keys())
 admins_dict = load_admins()
 registered_admins = list(admins_dict.keys())
 
-# --- 未ログイン時のメイン画面（中央エリアにログインフォームを表示） ---
+# --- 未ログイン時のメイン画面 ---
 if not st.session_state.logged_in:
     st.markdown("<p style='font-size:14px; font-weight:bold; color:#ff4b4b;'>一般社団法人 東京多摩ドローン協会</p>", unsafe_allow_html=True)
     st.title("🚁 ドローン国家資格 対策プラットフォーム")
@@ -614,7 +614,7 @@ if app_mode == "📝 問題演習・模擬テスト":
                     storage["exam_history"] = []
                 storage["exam_history"].append(new_record)
                 
-                # 【修正】本番模試や弱点克服、コース全体ランダム演習を含むすべてのテストで、解いた問題のカテゴリー別に正誤を蓄積・集計する
+                # 全モード共通でのカテゴリー別成績集計
                 if "category_stats" not in storage:
                     storage["category_stats"] = {}
                 if current_user not in storage["category_stats"]:
@@ -682,7 +682,7 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                 if email_clean not in admins_dict:
                     admins_dict[email_clean] = {"role": "admin", "appointed_by": current_user, "name": name_clean}
                     save_admins(admins_dict)
-                    st.success(f"🎉 `{email_clean}` を管理者に追加し、GitHubに自動同期しました！")
+                    st.success(f"🎉 `{email_clean}` を管理者に追加しました！")
                     st.rerun()
                 else:
                     st.warning("すでに登録されています。")
@@ -723,7 +723,7 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
                 if m_email_clean not in email_to_name:
                     email_to_name[m_email_clean] = m_name_clean
                     save_association_members_json(email_to_name)
-                    st.success(f"🎉 会員 `{m_email_clean}` を登録し、GitHubに自動同期しました！")
+                    st.success(f"🎉 会員 `{m_email_clean}` を登録しました！")
                     st.rerun()
                 else:
                     st.warning("すでに登録されています。")
@@ -911,7 +911,6 @@ elif app_mode == "🛠️ 管理者ダッシュボード":
             content_str = json.dumps(manual_backup_data, ensure_ascii=False, indent=2)
             with open(MANUAL_BACKUP_JSON_FILE, "w", encoding="utf-8") as f:
                 f.write(content_str)
-            commit_to_github(MANUAL_BACKUP_JSON_FILE, content_str, f"Manual backup created at {now_str}")
             
             st.success(f"🎉 手動バックアップを作成しました ({now_str})！")
             time.sleep(1)
